@@ -73,6 +73,37 @@ mountChips('buttons', buttons);
 mountList('architecture', architecture);
 mountSafety();
 
+async function refreshBackendStatus() {
+  const root = document.getElementById('backend-status');
+  try {
+    const response = await fetch('/api/state');
+    const state = await response.json();
+    root.innerHTML = `
+      <strong>Mode:</strong> ${state.mode}<br />
+      <strong>Approval required:</strong> ${state.approval_required ? 'yes' : 'no'}<br />
+      <strong>Last observation:</strong> ${state.last_observation}<br />
+      <strong>Plans:</strong> ${state.plans.length}<br />
+      <strong>Observations:</strong> ${state.observations.length}
+    `;
+  } catch {
+    root.textContent = 'Backend offline';
+  }
+}
+
+document.getElementById('record-observation').addEventListener('click', async () => {
+  await fetch('/api/observations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source: 'frontend',
+      note: 'Planning dashboard reviewed',
+    }),
+  });
+  await refreshBackendStatus();
+});
+
+refreshBackendStatus();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

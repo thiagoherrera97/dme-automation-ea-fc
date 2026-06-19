@@ -9,10 +9,18 @@ Uma dashboard mobile-first para planejar o fluxo, registrar restrições e servi
 ## Como rodar
 
 ```bash
-python3 -m http.server 8000 --directory .
+python3 server.py
 ```
 
 Depois abra `http://localhost:8000`.
+
+## API local
+
+- `GET /api/health`
+- `GET /api/state`
+- `POST /api/observations`
+- `POST /api/plans`
+- `POST /api/approvals`
 
 ## Arquitetura recomendada
 
