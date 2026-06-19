@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1420" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>DME Automation EA FC</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">iPhone-first planning dashboard</p>
+          <h1>DME Automation EA FC</h1>
+          <p class="lead">
+            Base do projeto para planejar, revisar e operar o fluxo com segurança.
+          </p>
+        </div>
+        <div class="hero-card">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Modo</strong>
+            <p>Exploração + planejamento</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Restrições do usuário</h2>
+          <ul id="constraints"></ul>
+        </article>
+
+        <article class="panel">
+          <h2>Fluxo base</h2>
+          <ol id="flow"></ol>
+        </article>
+
+        <article class="panel">
+          <h2>FUTGenie — botões mapeados</h2>
+          <div id="buttons" class="chips"></div>
+        </article>
+
+        <article class="panel">
+          <h2>Decisões de arquitetura</h2>
+          <ul id="architecture"></ul>
+        </article>
+      </section>
+
+      <section class="panel checklist">
+        <div class="panel-head">
+          <h2>Checklist de segurança</h2>
+          <p>Qualquer ação destrutiva exige autorização explícita.</p>
+        </div>
+        <div id="safety"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -2,6 +2,18 @@
 
 Projeto para automatizar tarefas repetitivas do EA FC Web App com foco em uso no iPhone.
 
+## MVP atual
+
+Uma dashboard mobile-first para planejar o fluxo, registrar restrições e servir de base para o automação futura.
+
+## Como rodar
+
+```bash
+python3 -m http.server 8000 --directory .
+```
+
+Depois abra `http://localhost:8000`.
+
 ## Arquitetura recomendada
 
 ### 1) Frontend mobile-first
