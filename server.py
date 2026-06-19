@@ -5,10 +5,18 @@ from dataclasses import dataclass, asdict, field
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import html as html_lib
+import re
 from typing import Any
+
+try:
+    from playwright.sync_api import sync_playwright
+except Exception:  # pragma: no cover - optional dependency in some envs
+    sync_playwright = None
 
 
 ROOT = Path(__file__).resolve().parent
+EA_URL = "https://www.ea.com/ea-sports-fc/ultimate-team/web-app/"
 
 
 @dataclass
@@ -54,6 +62,66 @@ WORKFLOWS: dict[str, dict[str, Any]] = {
 }
 
 
+def snapshot_ea_web_app() -> dict[str, Any]:
+    if sync_playwright is None:
+        raise RuntimeError("Playwright is not available")
+
+    with sync_playwright() as p:
+        browser = p.chromium.connect_over_cdp("http://localhost:29229")
+        context = browser.contexts[0]
+        candidate_pages = [candidate for candidate in context.pages if EA_URL in candidate.url]
+        page = None
+        for candidate in reversed(candidate_pages):
+            try:
+                html = candidate.content()
+            except Exception:
+                continue
+            if "Daily Common Gold Upgrade" in html:
+                page = candidate
+                break
+            if page is None and "Challenge Requirements" in html and "Auto Complete" in html:
+                page = candidate
+        if page is None and candidate_pages:
+            page = candidate_pages[-1]
+        created_page = False
+        if page is None:
+            page = context.new_page()
+            created_page = True
+        try:
+            if created_page:
+                page.goto(EA_URL, wait_until="domcontentloaded")
+                page.wait_for_timeout(3000)
+            try:
+                html = page.content()
+            except Exception:
+                page.wait_for_timeout(1000)
+                html = page.content()
+
+            title_match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.IGNORECASE | re.DOTALL)
+            nav_match = re.search(r"<nav[^>]*>(.*?)</nav>", html, re.IGNORECASE | re.DOTALL)
+            buttons = [
+                re.sub(r"<[^>]+>", "", text).strip()
+                for text in re.findall(r"<button[^>]*>(.*?)</button>", html, re.IGNORECASE | re.DOTALL)
+            ]
+            nav = []
+            if nav_match:
+                nav = [
+                    re.sub(r"<[^>]+>", "", text).strip()
+                    for text in re.findall(r"<button[^>]*>(.*?)</button>", nav_match.group(1), re.IGNORECASE | re.DOTALL)
+                ]
+            body = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html_lib.unescape(html))).strip()
+            return {
+                "url": page.url,
+                "title": html_lib.unescape(title_match.group(1)).strip() if title_match else "",
+                "buttons": [item for item in buttons if item],
+                "nav": [item for item in nav if item],
+                "body_preview": body[:1200],
+            }
+        finally:
+            if created_page:
+                page.close()
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -87,6 +155,12 @@ class Handler(SimpleHTTPRequestHandler):
                 }
             )
             return
+        if self.path == "/api/ea/snapshot":
+            try:
+                self._send_json(snapshot_ea_web_app())
+            except Exception as exc:  # pragma: no cover - live browser dependency
+                self._send_json({"ok": False, "error": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
+            return
         if self.path == "/api/flows/daily-common-gold-upgrade":
             self._send_json(WORKFLOWS["daily-common-gold-upgrade"])
             return
@@ -118,16 +192,20 @@ class Handler(SimpleHTTPRequestHandler):
 
         if self.path == "/api/flows/daily-common-gold-upgrade/plan":
             workflow = WORKFLOWS["daily-common-gold-upgrade"]
+            snapshot = snapshot_ea_web_app()
             plan = {
-                "name": workflow["name"],
+                "name": snapshot["title"] or workflow["name"],
                 "steps": [
+                    f"Ler o desafio aberto no EA FC: {snapshot['title'] or workflow['name']}",
                     *workflow["safe_steps"],
+                    "Capturar os botões visíveis e o estado do work area",
                     *workflow["gated_steps"],
                 ],
             }
             STATE.plans.append(plan)
             STATE.last_plan = plan["name"]
-            self._send_json({"ok": True, "plan": plan, "workflow": workflow}, HTTPStatus.CREATED)
+            STATE.last_observation = f"Live challenge: {snapshot['title'] or workflow['name']}"
+            self._send_json({"ok": True, "plan": plan, "workflow": workflow, "snapshot": snapshot}, HTTPStatus.CREATED)
             return
 
         if self.path == "/api/approvals":

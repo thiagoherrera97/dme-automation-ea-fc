@@ -140,6 +140,25 @@ async function loadWorkflow() {
   });
 }
 
+async function captureSnapshot() {
+  const root = document.getElementById('ea-snapshot');
+  root.textContent = 'Capturando…';
+  const response = await fetch('/api/ea/snapshot');
+  const snapshot = await response.json();
+  if (!response.ok) {
+    root.textContent = `Snapshot failed: ${snapshot.error}`;
+    return;
+  }
+  root.innerHTML = `
+    <strong>${snapshot.title}</strong><br />
+    <strong>URL:</strong> ${snapshot.url}<br />
+    <strong>Nav:</strong> ${snapshot.nav.join(' · ')}<br />
+    <strong>Buttons:</strong> ${snapshot.buttons.slice(0, 12).join(' · ')}<br />
+    <strong>Preview:</strong><br />
+    <pre>${snapshot.body_preview.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</pre>
+  `;
+}
+
 document.getElementById('record-observation').addEventListener('click', async () => {
   await fetch('/api/observations', {
     method: 'POST',
@@ -161,6 +180,8 @@ document.getElementById('load-workflow').addEventListener('click', async () => {
   `;
   await refreshBackendStatus();
 });
+
+document.getElementById('capture-snapshot').addEventListener('click', captureSnapshot);
 
 refreshBackendStatus();
 
