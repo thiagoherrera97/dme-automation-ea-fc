@@ -82,12 +82,62 @@ async function refreshBackendStatus() {
       <strong>Mode:</strong> ${state.mode}<br />
       <strong>Approval required:</strong> ${state.approval_required ? 'yes' : 'no'}<br />
       <strong>Last observation:</strong> ${state.last_observation}<br />
+      <strong>Last plan:</strong> ${state.last_plan}<br />
       <strong>Plans:</strong> ${state.plans.length}<br />
       <strong>Observations:</strong> ${state.observations.length}
     `;
   } catch {
     root.textContent = 'Backend offline';
   }
+}
+
+async function loadWorkflow() {
+  const root = document.getElementById('workflow-status');
+  const approval = document.getElementById('approval-preview');
+  root.textContent = 'Carregando…';
+  const response = await fetch('/api/flows/daily-common-gold-upgrade');
+  const workflow = await response.json();
+  root.innerHTML = `
+    <strong>${workflow.name}</strong><br />
+    ${workflow.summary}<br />
+    <strong>Requirements:</strong>
+    <ul>${workflow.requirements.map((item) => `<li>${item}</li>`).join('')}</ul>
+    <strong>Safe steps:</strong>
+    <ol>${workflow.safe_steps.map((item) => `<li>${item}</li>`).join('')}</ol>
+    <strong>Approval gate:</strong>
+    <ul>${workflow.gated_steps.map((item) => `<li>${item}</li>`).join('')}</ul>
+  `;
+  approval.classList.add('visible');
+  approval.innerHTML = `
+    <h3>Approval preview</h3>
+    <p><strong>Squad:</strong> ${workflow.approval_preview.squad_name}</p>
+    <p><strong>Formation:</strong> ${workflow.approval_preview.formation}</p>
+    <p><strong>Rating:</strong> ${workflow.approval_preview.rating} | <strong>Chemistry:</strong> ${workflow.approval_preview.chemistry}</p>
+    <p><strong>Slots:</strong> ${workflow.approval_preview.players.join(' · ')}</p>
+    <div class="approval-actions">
+      <button id="approve-workflow" class="approval-button primary" type="button">Submit</button>
+      <button id="cancel-workflow" class="approval-button secondary" type="button">Cancel</button>
+    </div>
+  `;
+  document.getElementById('approve-workflow').addEventListener('click', async () => {
+    await fetch('/api/approvals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approved: true,
+        note: 'Daily Common Gold Upgrade approved',
+      }),
+    });
+    await refreshBackendStatus();
+    approval.querySelector('.approval-actions').insertAdjacentHTML(
+      'afterend',
+      '<p style="color: var(--accent-2); margin-top: 10px;">Approval saved. No SBC submitted automatically.</p>',
+    );
+  });
+  document.getElementById('cancel-workflow').addEventListener('click', () => {
+    approval.classList.remove('visible');
+    approval.innerHTML = '';
+  });
 }
 
 document.getElementById('record-observation').addEventListener('click', async () => {
@@ -99,6 +149,16 @@ document.getElementById('record-observation').addEventListener('click', async ()
       note: 'Planning dashboard reviewed',
     }),
   });
+  await refreshBackendStatus();
+});
+
+document.getElementById('load-workflow').addEventListener('click', async () => {
+  await loadWorkflow();
+  const response = await fetch('/api/flows/daily-common-gold-upgrade/plan', { method: 'POST' });
+  const result = await response.json();
+  document.getElementById('workflow-status').innerHTML += `
+    <br /><strong>Generated plan:</strong> ${result.plan.name}
+  `;
   await refreshBackendStatus();
 });
 

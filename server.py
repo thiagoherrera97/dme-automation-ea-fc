@@ -16,11 +16,42 @@ class AppState:
     mode: str = "planning"
     approval_required: bool = True
     last_observation: str = "No observations yet"
+    last_plan: str = "No plan yet"
     plans: list[dict[str, Any]] = field(default_factory=list)
     observations: list[dict[str, Any]] = field(default_factory=list)
 
 
 STATE = AppState()
+
+WORKFLOWS: dict[str, dict[str, Any]] = {
+    "daily-common-gold-upgrade": {
+        "name": "Daily Common Gold Upgrade",
+        "mode": "sbc-specific-flow",
+        "summary": "Mapeia e prepara o fluxo do upgrade diário sem concluir o envio.",
+        "requirements": [
+            "Bronze: Min. 5 Players",
+            "Silver: Min. 5 Players",
+            "Number of Players in the Squad: 10",
+        ],
+        "safe_steps": [
+            "Ler o título e os requisitos do desafio",
+            "Inspecionar o estado atual do squad",
+            "Registrar a composição visível sem mover jogadores",
+            "Preparar um plano de preenchimento",
+        ],
+        "gated_steps": [
+            "Pedir autorização explícita antes de qualquer submit",
+            "Parar se houver risco de consumir jogadores que o usuário quer preservar",
+        ],
+        "approval_preview": {
+            "squad_name": "Working Area",
+            "formation": "Unknown",
+            "rating": "0",
+            "chemistry": "0/33",
+            "players": ["GK", "RB", "CB", "CB", "LB", "RM", "CM", "CM", "LM", "ST", "ST"],
+        },
+    }
+}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -50,10 +81,14 @@ class Handler(SimpleHTTPRequestHandler):
                     "mode": STATE.mode,
                     "approval_required": STATE.approval_required,
                     "last_observation": STATE.last_observation,
+                    "last_plan": STATE.last_plan,
                     "plans": STATE.plans,
                     "observations": STATE.observations,
                 }
             )
+            return
+        if self.path == "/api/flows/daily-common-gold-upgrade":
+            self._send_json(WORKFLOWS["daily-common-gold-upgrade"])
             return
         super().do_GET()
 
@@ -77,7 +112,22 @@ class Handler(SimpleHTTPRequestHandler):
                 "steps": list(payload.get("steps", [])),
             }
             STATE.plans.append(plan)
+            STATE.last_plan = plan["name"]
             self._send_json({"ok": True, "plan": plan}, HTTPStatus.CREATED)
+            return
+
+        if self.path == "/api/flows/daily-common-gold-upgrade/plan":
+            workflow = WORKFLOWS["daily-common-gold-upgrade"]
+            plan = {
+                "name": workflow["name"],
+                "steps": [
+                    *workflow["safe_steps"],
+                    *workflow["gated_steps"],
+                ],
+            }
+            STATE.plans.append(plan)
+            STATE.last_plan = plan["name"]
+            self._send_json({"ok": True, "plan": plan, "workflow": workflow}, HTTPStatus.CREATED)
             return
 
         if self.path == "/api/approvals":
